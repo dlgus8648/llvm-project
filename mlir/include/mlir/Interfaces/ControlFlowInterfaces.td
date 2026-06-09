@@ -126,13 +126,6 @@ def RegionBranchOpInterface : OpInterface<"RegionBranchOpInterface"> {
     value propagation, where what occurs along control-flow edges is assumed to
     be side-effect free.
 
-    Completeness is a core contract of this interface: the implementation must
-    model all possible control flow edges, so that callers can rely on the
-    returned information as a complete picture. Failing to report a possible
-    edge is an incorrect implementation and may cause analyses/transformations
-    to produce incorrect results. (It is acceptable to over-approximate by
-    reporting edges that turn out to be infeasible at runtime.)
-
     A "region branch point" indicates the point from which a branch (edge)
     originates. It can indicate:
     1. A `RegionBranchTerminatorOpInterface` terminator in any of the
@@ -218,6 +211,14 @@ def RegionBranchOpInterface : OpInterface<"RegionBranchOpInterface"> {
         Note: The control flow does not necessarily have to enter any region of
         this op.
 
+        The returned successors must be complete with respect to the constant
+        operand information in `operands`: every region successor that could be
+        taken on entry must be included unless it is ruled out by an entry in
+        `operands`. Omitting a successor that is possible is an incorrect
+        implementation and may cause analyses/transformations to produce
+        incorrect results. It is acceptable to over-approximate by reporting
+        successors that turn out to be infeasible at runtime.
+
         Example: In the above example, this method may return two region
         region successors: the single region of the `scf.for` op and the
         `scf.for` operation (that implements this interface). If %lb, %ub, %step
@@ -242,6 +243,13 @@ def RegionBranchOpInterface : OpInterface<"RegionBranchOpInterface"> {
         returns the successor regions when branching from the region indicated
         by `point`.
 
+        The returned successors must include every region successor that
+        control flow could reach from `point`. Omitting a successor that is
+        possible from `point` is an incorrect implementation and may cause
+        analyses/transformations to produce incorrect results. It is acceptable
+        to over-approximate by reporting successors that turn out to be
+        infeasible at runtime.
+
         Example: In the above example, this method returns the region of the
         `scf.for` and `parent` for either region branch point. An implementation
         may choose to filter out region successors when it is statically known
@@ -255,6 +263,13 @@ def RegionBranchOpInterface : OpInterface<"RegionBranchOpInterface"> {
     InterfaceMethod<[{
         Returns the potential region successors when branching from any
         terminator in `region`.
+
+        The returned successors must include every region successor that any
+        `RegionBranchTerminatorOpInterface` terminator in `region` could
+        branch to. Omitting a successor reachable from any such terminator is
+        an incorrect implementation and may cause analyses/transformations to
+        produce incorrect results. It is acceptable to over-approximate by
+        reporting successors that turn out to be infeasible at runtime.
       }],
       "void", "getSuccessorRegions",
       (ins "::mlir::Region&":$region,
@@ -286,6 +301,13 @@ def RegionBranchOpInterface : OpInterface<"RegionBranchOpInterface"> {
     InterfaceMethod<[{
         Returns the potential branching points (predecessors) for a given
         region successor.
+
+        The returned predecessors must include every `RegionBranchPoint` from
+        which control flow could reach `successor`. Omitting a possible
+        predecessor is an incorrect implementation and may cause
+        analyses/transformations to produce incorrect results. It is acceptable
+        to over-approximate by reporting predecessors that turn out to be
+        infeasible at runtime.
       }],
       "void", "getPredecessors",
       (ins "::mlir::RegionSuccessor":$successor,
@@ -456,6 +478,14 @@ def RegionBranchTerminatorOpInterface :
 
         The default implementation simply dispatches to the parent
         `RegionBranchOpInterface`'s `getSuccessorRegions` implementation.
+
+        The returned successors must be complete with respect to the constant
+        operand information in `operands`: every region successor that this
+        terminator could branch to must be included unless it is ruled out by
+        an entry in `operands`. Omitting a successor that is possible is an
+        incorrect implementation and may cause analyses/transformations to
+        produce incorrect results. It is acceptable to over-approximate by
+        reporting successors that turn out to be infeasible at runtime.
       }],
       "void", "getSuccessorRegions",
       (ins "::llvm::ArrayRef<::mlir::Attribute>":$operands,
